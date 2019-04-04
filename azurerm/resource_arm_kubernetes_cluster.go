@@ -163,6 +163,35 @@ func resourceArmKubernetesCluster() *schema.Resource {
 							Computed: true,
 							ForceNew: true,
 						},
+
+						"enable_autoscaling": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							ForceNew: true,
+						},
+
+						"min_count": {
+							Type:         schema.TypeInt,
+							Optional:     true,
+							ValidateFunc: validation.IntBetween(1, 100),
+						},
+
+						"type": {
+							Type:     schema.TypeString,
+							Optional: true,
+							ForceNew: true,
+							Default:  containerservice.AvailabilitySet,
+							ValidateFunc: validation.StringInSlice([]string{
+								string(containerservice.AvailabilitySet),
+								string(containerservice.VirtualMachineScaleSets),
+							}, false),
+						},
+
+						"max_count": {
+							Type:         schema.TypeInt,
+							Optional:     true,
+							ValidateFunc: validation.IntBetween(1, 100),
+						},
 					},
 				},
 			},
@@ -558,6 +587,43 @@ func resourceArmKubernetesClusterCreateUpdate(d *schema.ResourceData, meta inter
 	networkProfile := expandKubernetesClusterNetworkProfile(d)
 	addonProfiles := expandKubernetesClusterAddonProfiles(d)
 
+	if agentProfiles[0].Type == containerservice.AvailabilitySet && agentProfiles[0].EnableAutoScaling != nil && *agentProfiles[0].EnableAutoScaling {
+		return fmt.Errorf("`enable_autoscaling` must be `false` if `type` is `AvailabilitySet`.")
+	}
+
+	if agentProfiles[0].EnableAutoScaling != nil && !*agentProfiles[0].EnableAutoScaling {
+		if agentProfiles[0].MaxCount != nil {
+			return fmt.Errorf("`max_count` cannot be set unless `enable_autoscaling` is set to `true`.")
+		}
+		if agentProfiles[0].MinCount != nil {
+			return fmt.Errorf("`min_count` cannot be set unless `enable_autoscaling` is set to `true`.")
+		}
+	}
+
+	if agentProfiles[0].MaxCount != nil && agentProfiles[0].MinCount != nil {
+		if *agentProfiles[0].MaxCount < *agentProfiles[0].MinCount {
+			return fmt.Errorf("`max_count` must be greater than `min_count`.")
+		}
+
+		if agentProfiles[0].Count != nil {
+			if *agentProfiles[0].Count < *agentProfiles[0].MinCount {
+				return fmt.Errorf("`count` must be greater than `min_count`.")
+			}
+
+			if *agentProfiles[0].Count > *agentProfiles[0].MaxCount {
+				return fmt.Errorf("`count` must be less than `max_count`.")
+			}
+		}
+	}
+
+	if *agentProfiles[0].EnableAutoScaling && agentProfiles[0].MaxCount == nil {
+		return fmt.Errorf("`max_count` must be set when `enable_autoscaling` is set to `true`.")
+	}
+
+	if *agentProfiles[0].EnableAutoScaling && agentProfiles[0].MinCount == nil {
+		return fmt.Errorf("`min_count` must be set when `enable_autoscaling` is set to `true`.")
+	}
+
 	tags := d.Get("tags").(map[string]interface{})
 
 	// we can't do this in the CustomizeDiff since the interpolations aren't evaluated at that point
@@ -901,13 +967,28 @@ func expandKubernetesClusterAgentPoolProfiles(d *schema.ResourceData) []containe
 	vmSize := config["vm_size"].(string)
 	osDiskSizeGB := int32(config["os_disk_size_gb"].(int))
 	osType := config["os_type"].(string)
+	enableAutoscaling := config["enable_autoscaling"].(bool)
 
 	profile := containerservice.ManagedClusterAgentPoolProfile{
-		Name:         utils.String(name),
-		Count:        utils.Int32(count),
-		VMSize:       containerservice.VMSizeTypes(vmSize),
-		OsDiskSizeGB: utils.Int32(osDiskSizeGB),
-		OsType:       containerservice.OSType(osType),
+		Name:              utils.String(name),
+		Count:             utils.Int32(count),
+		VMSize:            containerservice.VMSizeTypes(vmSize),
+		OsDiskSizeGB:      utils.Int32(osDiskSizeGB),
+		OsType:            containerservice.OSType(osType),
+		EnableAutoScaling: utils.Bool(enableAutoscaling),
+	}
+
+	agentType := config["type"].(string)
+	profile.Type = containerservice.AgentPoolType(agentType)
+
+	if enableAutoscaling {
+		if minCount := int32(config["min_count"].(int)); minCount >= 0 {
+			profile.MinCount = utils.Int32(minCount)
+		}
+
+		if maxCount := int32(config["max_count"].(int)); maxCount > 0 {
+			profile.MaxCount = utils.Int32(maxCount)
+		}
 	}
 
 	if maxPods := int32(config["max_pods"].(int)); maxPods > 0 {
@@ -963,6 +1044,18 @@ func flattenKubernetesClusterAgentPoolProfiles(profiles *[]containerservice.Mana
 
 		if profile.MaxPods != nil {
 			agentPoolProfile["max_pods"] = int(*profile.MaxPods)
+		}
+
+		agentPoolProfile["type"] = string(profile.Type)
+		if profile.MinCount != nil {
+			agentPoolProfile["min_count"] = int(*profile.MinCount)
+		}
+		if profile.MaxCount != nil {
+			agentPoolProfile["max_count"] = int(*profile.MaxCount)
+		}
+
+		if profile.EnableAutoScaling != nil {
+			agentPoolProfile["enable_autoscaling"] = *profile.EnableAutoScaling
 		}
 
 		agentPoolProfiles = append(agentPoolProfiles, agentPoolProfile)

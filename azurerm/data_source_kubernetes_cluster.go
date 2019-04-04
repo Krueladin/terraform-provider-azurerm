@@ -112,6 +112,21 @@ func dataSourceArmKubernetesCluster() *schema.Resource {
 							Type:     schema.TypeInt,
 							Computed: true,
 						},
+
+						"enable_autoscaling": {
+							Type:     schema.TypeBool,
+							Computed: true,
+						},
+
+						"min_count": {
+							Type:     schema.TypeInt,
+							Computed: true,
+						},
+
+						"max_count": {
+							Type:     schema.TypeInt,
+							Computed: true,
+						},
 					},
 				},
 			},
@@ -577,6 +592,18 @@ func flattenKubernetesClusterDataSourceAgentPoolProfiles(input *[]containerservi
 
 		if profile.MaxPods != nil {
 			agentPoolProfile["max_pods"] = int(*profile.MaxPods)
+		}
+
+		if profile.MinCount != nil {
+			agentPoolProfile["min_count"] = int(*profile.MinCount)
+		}
+
+		if profile.MaxCount != nil {
+			agentPoolProfile["max_count"] = int(*profile.MaxCount)
+		}
+
+		if profile.EnableAutoScaling != nil {
+			agentPoolProfile["enable_autoscaling"] = *profile.EnableAutoScaling
 		}
 
 		agentPoolProfiles = append(agentPoolProfiles, agentPoolProfile)
