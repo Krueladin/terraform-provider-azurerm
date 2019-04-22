@@ -41,6 +41,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/preview/devspaces/mgmt/2018-06-01-preview/devspaces"
 	"github.com/Azure/azure-sdk-for-go/services/preview/dns/mgmt/2018-03-01-preview/dns"
 	"github.com/Azure/azure-sdk-for-go/services/preview/eventgrid/mgmt/2018-09-15-preview/eventgrid"
+	frontdoor "github.com/Azure/azure-sdk-for-go/services/preview/frontdoor/mgmt/2019-04-01/frontdoor"
 	"github.com/Azure/azure-sdk-for-go/services/preview/hdinsight/mgmt/2018-06-01-preview/hdinsight"
 	"github.com/Azure/azure-sdk-for-go/services/preview/iothub/mgmt/2018-12-01-preview/devices"
 	"github.com/Azure/azure-sdk-for-go/services/preview/mariadb/mgmt/2018-06-01-preview/mariadb"
@@ -243,6 +244,17 @@ type ArmClient struct {
 
 	// Databricks
 	databricksWorkspacesClient databricks.WorkspacesClient
+
+	// Front Door
+	frontDoorBackendPoolsClient      frontdoor.BackendPoolsClient
+	frontDoorFrontendEndpointsClient frontdoor.FrontendEndpointsClient
+	frontDoorHealthProbeClient       frontdoor.HealthProbeSettingsClient
+	frontDoorLoadBalancingClient     frontdoor.LoadBalancingSettingsClient
+	frontDoorManagedRuleSetsClient   frontdoor.ManagedRuleSetsClient
+	frontDoorManagementClient        frontdoor.BaseClient
+	frontDoorPoliciesClient          frontdoor.PoliciesClient
+	frontDoorRoutingRulesClient      frontdoor.RoutingRulesClient
+	frontDoorsClient                 frontdoor.FrontDoorsClient
 
 	// HDInsight
 	hdinsightApplicationsClient   hdinsight.ApplicationsClient
